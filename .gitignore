@@ -40,3 +40,16 @@ venv/
 # Arquivos temporários
 *.tmp
 *.temp
+
+# Gerenciadores / caches de frontend
+.npm/
+.pnpm-store/
+.yarn/
+.turbo/
+.eslintcache
+.parcel-cache/
+*.tsbuildinfo
+.next/
+.nuxt/
+.svelte-kit/
+storybook-static/

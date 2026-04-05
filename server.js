@@ -55,6 +55,7 @@ const VALORES_PECAS = {
 };
 
 const LIMITE_MAO = 3;
+const LIMITE_CARTAS_POR_JOGO = 3;
 
 const DEFINICOES_CARTAS = {
     marcha_lateral: {
@@ -70,7 +71,7 @@ const DEFINICOES_CARTAS = {
     reviver_aliado: {
         id: 'reviver_aliado',
         nome: 'Reviver Aliado',
-        descricao: 'Permite que um bispo reviva uma peça capturada em uma casa vazia adjacente.'
+        descricao: 'Permite que um bispo reviva uma peça capturada em uma casa vazia adjacente, sacrificando o próprio bispo.'
     }
 };
 
@@ -80,7 +81,6 @@ const BARALHO_BASE = [
     'marcha_lateral',
     'salto_cavaleiro',
     'salto_cavaleiro',
-    'reviver_aliado',
     'reviver_aliado'
 ];
 
@@ -96,7 +96,26 @@ function embaralhar(lista) {
 }
 
 function criarBaralho() {
-    return embaralhar(BARALHO_BASE);
+    const cartasBase = [...BARALHO_BASE];
+    const baralho = [];
+    let reviveAdicionado = false;
+
+    while (baralho.length < LIMITE_CARTAS_POR_JOGO && cartasBase.length > 0) {
+        const indice = Math.floor(Math.random() * cartasBase.length);
+        const cartaId = cartasBase.splice(indice, 1)[0];
+
+        if (cartaId === 'reviver_aliado') {
+            if (reviveAdicionado) {
+                continue;
+            }
+
+            reviveAdicionado = true;
+        }
+
+        baralho.push(cartaId);
+    }
+
+    return embaralhar(baralho);
 }
 
 function gerarTokenJogador() {
@@ -105,6 +124,61 @@ function gerarTokenJogador() {
 
 function criarPeca(tipo, cor) {
     return { tipo, cor, modificadores: [] };
+}
+
+function normalizarCartasJogadorEstado(dados = {}) {
+    const origemMao = Array.isArray(dados.mao) ? [...dados.mao] : [];
+    const origemBaralho = Array.isArray(dados.baralho) ? [...dados.baralho] : [];
+    const selecionadas = [];
+    let reviveUtilizado = false;
+
+    const tentarAdicionar = (item) => {
+        if (selecionadas.length >= LIMITE_CARTAS_POR_JOGO) {
+            return;
+        }
+
+        const cartaId = typeof item === 'string' ? item : item?.id;
+        if (!DEFINICOES_CARTAS[cartaId]) {
+            return;
+        }
+
+        if (cartaId === 'reviver_aliado') {
+            if (reviveUtilizado) {
+                return;
+            }
+
+            reviveUtilizado = true;
+        }
+
+        selecionadas.push(cartaId);
+    };
+
+    origemMao.forEach(tentarAdicionar);
+    origemBaralho.forEach(tentarAdicionar);
+
+    while (selecionadas.length < LIMITE_CARTAS_POR_JOGO) {
+        const faltantes = criarBaralho().filter(cartaId => {
+            if (cartaId === 'reviver_aliado' && reviveUtilizado) {
+                return false;
+            }
+
+            return true;
+        });
+
+        if (faltantes.length === 0) {
+            break;
+        }
+
+        tentarAdicionar(faltantes[0]);
+    }
+
+    const maoIds = selecionadas.slice(0, LIMITE_MAO);
+    const baralhoIds = selecionadas.slice(LIMITE_MAO);
+
+    return {
+        mao: maoIds.map(cartaId => ({ ...DEFINICOES_CARTAS[cartaId] })),
+        baralho: baralhoIds
+    };
 }
 
 function copiarPeca(peca) {
@@ -159,10 +233,12 @@ function iniciarTabuleiro() {
 }
 
 function criarJogador(dados = {}) {
+    const cartasNormalizadas = normalizarCartasJogadorEstado(dados);
+
     return {
         token: dados.token || gerarTokenJogador(),
-        baralho: Array.isArray(dados.baralho) ? [...dados.baralho] : criarBaralho(),
-        mao: Array.isArray(dados.mao) ? dados.mao.map(copiarCarta) : [],
+        baralho: cartasNormalizadas.baralho,
+        mao: cartasNormalizadas.mao,
         cemiterio: Array.isArray(dados.cemiterio) ? dados.cemiterio.map(copiarPeca) : [],
         cartaUsadaNesteTurno: Boolean(dados.cartaUsadaNesteTurno),
         conectado: false
@@ -274,7 +350,7 @@ function comprarCarta(sala, cor) {
     }
 
     if (jogador.baralho.length === 0) {
-        jogador.baralho = criarBaralho();
+        return null;
     }
 
     const cartaId = jogador.baralho.pop();
@@ -334,6 +410,40 @@ function enviarEstado(ws, sala, papel) {
     }));
 }
 
+function salaTemConexaoAtiva(sala) {
+    return Boolean(sala.conexoes.branco || sala.conexoes.preto || sala.conexoes.espectadores.size > 0);
+}
+
+function montarSalasAtivas() {
+    return Array.from(salas.values())
+        .filter(sala => salaTemConexaoAtiva(sala))
+        .map(sala => ({
+            codigo: sala.codigo,
+            turno: sala.turno,
+            brancoConectado: Boolean(sala.conexoes.branco),
+            pretoConectado: Boolean(sala.conexoes.preto),
+            espectadores: sala.conexoes.espectadores.size
+        }))
+        .sort((a, b) => a.codigo.localeCompare(b.codigo));
+}
+
+function enviarSalasAtivas(ws) {
+    if (ws.readyState !== WebSocket.OPEN) {
+        return;
+    }
+
+    ws.send(JSON.stringify({
+        acao: 'SALAS_ATIVAS',
+        salas: montarSalasAtivas()
+    }));
+}
+
+function publicarSalasAtivas() {
+    wss.clients.forEach(cliente => {
+        enviarSalasAtivas(cliente);
+    });
+}
+
 async function persistirSala(sala) {
     const estado = JSON.stringify(serializarSala(sala));
 
@@ -365,6 +475,8 @@ function publicarEstadoSala(sala) {
     persistirSala(sala).catch(error => {
         console.error(`Falha ao persistir sala ${sala.codigo}:`, error);
     });
+
+    publicarSalasAtivas();
 }
 
 function registrarCaptura(sala, pecaCapturada, corAtacante) {
@@ -486,6 +598,7 @@ function removerSocketDaSala(ws) {
     }
 
     sockets.delete(ws);
+    publicarSalasAtivas();
 }
 
 function vincularSocketASala(ws, sala, papel, tokenJogador = null) {
@@ -524,6 +637,7 @@ function vincularSocketASala(ws, sala, papel, tokenJogador = null) {
     sockets.set(ws, { codigoSala: sala.codigo, papel });
     enviarEstado(ws, sala, papel);
     publicarEstadoSala(sala);
+    publicarSalasAtivas();
 }
 
 function anunciarVinculo(ws, sala, papel) {
@@ -567,6 +681,20 @@ function registrarJogada(sala, origem, destino) {
 
 function ehUsuarioDoTurno(sala, papel) {
     return papel === sala.turno;
+}
+
+function ehCasaAdjacente(origem, destino) {
+    const dx = Math.abs(destino.coluna - origem.coluna);
+    const dy = Math.abs(destino.linha - origem.linha);
+    return dx <= 1 && dy <= 1 && (dx + dy > 0);
+}
+
+function montarOpcoesReviviveis(cemiterio) {
+    return cemiterio.map((peca, indice) => ({
+        indice,
+        tipo: peca.tipo,
+        cor: peca.cor
+    }));
 }
 
 function movimentosDaCarta(sala, cartaId, origem) {
@@ -651,7 +779,24 @@ function aplicarCarta(sala, papel, dados) {
             return false;
         }
 
-        const pecaRevivida = cemiterio.pop();
+        const indiceRevivido = Number.isInteger(dados.indiceRevivido)
+            ? dados.indiceRevivido
+            : cemiterio.length - 1;
+
+        if (indiceRevivido < 0 || indiceRevivido >= cemiterio.length) {
+            return false;
+        }
+
+        const [pecaRevivida] = cemiterio.splice(indiceRevivido, 1);
+
+        // Sacrifício obrigatório: o bispo que conjurou o revive sai do tabuleiro.
+        sala.tabuleiro[dados.origem.linha][dados.origem.coluna] = null;
+        cemiterio.push({
+            tipo: 'bispo',
+            cor: papel,
+            modificadores: []
+        });
+
         sala.tabuleiro[dados.destino.linha][dados.destino.coluna] = {
             tipo: pecaRevivida.tipo,
             cor: pecaRevivida.cor,
@@ -714,6 +859,7 @@ wss.on('connection', (ws) => {
     ws.send(JSON.stringify({
         acao: 'CONEXAO_ESTABELECIDA'
     }));
+    enviarSalasAtivas(ws);
 
     ws.on('message', (message) => {
         let dados;
@@ -739,6 +885,26 @@ wss.on('connection', (ws) => {
             salas.set(codigoSala, sala);
             vincularSocketASala(ws, sala, 'branco', sala.jogadores.branco.token);
             anunciarVinculo(ws, sala, 'branco');
+            return;
+        }
+
+        if (dados.acao === 'LISTAR_SALAS') {
+            enviarSalasAtivas(ws);
+            return;
+        }
+
+        if (dados.acao === 'SAIR_SALA') {
+            const contextoAtual = sockets.get(ws);
+
+            if (!contextoAtual) {
+                ws.send(JSON.stringify({ acao: 'SALA_SAIDA' }));
+                enviarSalasAtivas(ws);
+                return;
+            }
+
+            removerSocketDaSala(ws);
+            ws.send(JSON.stringify({ acao: 'SALA_SAIDA' }));
+            enviarSalasAtivas(ws);
             return;
         }
 
@@ -803,9 +969,13 @@ wss.on('connection', (ws) => {
             }
 
             let movimentosPermitidos = [];
+            let opcoesReviviveis = [];
 
             if (dados.cartaId === 'reviver_aliado') {
                 movimentosPermitidos = movimentosDaCarta(sala, dados.cartaId, origem);
+                if (movimentosPermitidos.length > 0) {
+                    opcoesReviviveis = montarOpcoesReviviveis(sala.jogadores[contexto.papel].cemiterio);
+                }
             } else {
                 for (let linha = 0; linha < 8; linha++) {
                     for (let coluna = 0; coluna < 8; coluna++) {
@@ -817,7 +987,11 @@ wss.on('connection', (ws) => {
                 }
             }
 
-            ws.send(JSON.stringify({ acao: 'MOVIMENTOS_PERMITIDOS', movimentos: movimentosPermitidos }));
+            ws.send(JSON.stringify({
+                acao: 'MOVIMENTOS_PERMITIDOS',
+                movimentos: movimentosPermitidos,
+                opcoesReviviveis
+            }));
             return;
         }
 

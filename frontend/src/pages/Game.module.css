@@ -1,0 +1,250 @@
+.container {
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-lg);
+}
+
+.gameContainer {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: var(--font-size-lg);
+  color: var(--color-gray-600);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.playerInfo {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.boardContainer {
+  flex: 1;
+}
+
+.board {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-white);
+  min-height: 640px;
+}
+
+.tabuleiro {
+  width: min(92vw, 680px);
+  height: min(92vw, 680px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #173825 0%, #2a5a3c 100%);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-xl);
+}
+
+.placeholder {
+  text-align: center;
+  padding: var(--spacing-3xl);
+}
+
+.chessBoard {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  border: 4px solid rgba(255, 255, 255, 0.14);
+}
+
+.casa {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast);
+}
+
+.coordRank {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: clamp(0.62rem, 0.8vw, 0.82rem);
+  font-weight: var(--font-weight-bold);
+  color: rgba(31, 41, 55, 0.78);
+  user-select: none;
+}
+
+.coordFile {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  font-size: clamp(0.62rem, 0.8vw, 0.82rem);
+  font-weight: var(--font-weight-bold);
+  color: rgba(31, 41, 55, 0.78);
+  user-select: none;
+}
+
+.casa:hover {
+  filter: brightness(1.04);
+}
+
+.light {
+  background-color: #f7efe0;
+}
+
+.dark {
+  background-color: #9f7b4e;
+}
+
+.selected {
+  box-shadow: inset 0 0 0 4px #1f2937;
+}
+
+.possibleMove {
+  box-shadow: inset 0 0 0 3px rgba(16, 185, 129, 0.9);
+}
+
+.peca {
+  position: relative;
+  z-index: 2;
+  font-size: clamp(1.4rem, 3vw, 2.6rem);
+  line-height: 1;
+  user-select: none;
+  transition: transform var(--transition-fast);
+}
+
+.casa:hover .peca {
+  transform: scale(1.08);
+}
+
+.whitePiece {
+  color: #ffffff;
+  text-shadow: -1px -1px 0 #1f2937, 1px -1px 0 #1f2937, -1px 1px 0 #1f2937, 1px 1px 0 #1f2937;
+}
+
+.blackPiece {
+  color: #111827;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.moveDot {
+  position: absolute;
+  width: clamp(10px, 1.3vw, 16px);
+  height: clamp(10px, 1.3vw, 16px);
+  border-radius: 999px;
+  background-color: rgba(16, 185, 129, 0.85);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8);
+}
+
+.gameInfo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.handGrid {
+  display: grid;
+  gap: var(--spacing-sm);
+  grid-template-columns: 1fr;
+}
+
+.handCard {
+  width: 100%;
+  text-align: left;
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  background: var(--color-white);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.handCard:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.handCard strong {
+  color: var(--color-primary-dark);
+}
+
+.handCard span {
+  color: var(--color-gray-700);
+  font-size: var(--font-size-sm);
+}
+
+.handCardActive {
+  border-color: var(--color-secondary-dark);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.28);
+}
+
+.cardActions {
+  margin-top: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.reviveOptions {
+  padding: var(--spacing-lg);
+}
+
+.optionsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.errorMessage {
+  margin-top: var(--spacing-sm);
+  color: var(--color-error);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .playerInfo {
+    flex-direction: column;
+  }
+
+  .board {
+    min-height: 460px;
+  }
+
+  .tabuleiro {
+    width: min(94vw, 520px);
+    height: min(94vw, 520px);
+  }
+
+  .container {
+    padding: var(--spacing-md);
+  }
+}
