@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Xadrez Modificado</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <section class="lobby-panel">
+        <div class="lobby-top">
+            <div>
+                <h1>Crazy Chess</h1>
+                <p>Crie uma sala privada, compartilhe o código e entre com outro jogador ou um espectador.</p>
+            </div>
+            <div class="conexao-pill" id="status-conexao">Conectando...</div>
+        </div>
+
+        <div class="lobby-form">
+            <label for="codigo-sala">Código da sala</label>
+            <div class="lobby-input-group">
+                <input id="codigo-sala" type="text" maxlength="12" placeholder="Ex: A1B2C3">
+                <button id="criar-sala" type="button">Criar sala</button>
+                <button id="entrar-sala" type="button" class="botao-secundario">Entrar</button>
+            </div>
+        </div>
+
+        <div class="lobby-meta">
+            <div>Sala: <strong id="sala-atual">Nenhuma</strong></div>
+            <div>Papel: <strong id="papel-atual">Desconhecido</strong></div>
+            <div id="status-sala">Aguardando conexão.</div>
+        </div>
+    </section>
+
+    <div class="painel">
+        <div>Status: <span id="status" style="color: #ff5555;">Desconectado 🔴</span></div>
+        <div id="indicador-turno" class="turno-badge">Aguardando...</div>
+    </div>
+
+    <div class="placar-container">
+        <div class="placar-item placar-branco">Brancas: <span id="pontos-branco">0</span></div>
+        <div class="placar-item placar-preto">Pretas: <span id="pontos-preto">0</span></div>
+    </div>
+
+    <div id="tabuleiro"></div>
+
+    <section class="cartas-panel">
+        <div class="cartas-header">
+            <div>
+                <h2>Cartas da mão</h2>
+                <p id="mensagem-carta">Selecione uma carta para ativar um efeito especial.</p>
+            </div>
+            <button id="cancelar-carta" type="button" class="botao-secundario">Cancelar carta</button>
+        </div>
+        <div id="cartas-container" class="cartas-container"></div>
+    </section>
+
+
+    <script>
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}`;
+        const storageKeys = {
+            codigoSala: 'crazyChess.codigoSala',
+            tokenJogador: 'crazyChess.tokenJogador',
+            papel: 'crazyChess.papel'
+        };
+
+        let selecao = null;
+        let tabuleiroAtual = [];
+        let turnoAtual = '';
+        let movimentosDestacados = [];
+        let maoAtual = [];
+        let cartaAtiva = null;
+        let origemCarta = null;
+        let codigoSalaAtual = '';
+        let papelAtual = 'desconhecido';
+        let tokenJogadorAtual = '';
+        let socket = null;
+        let filaMensagens = [];
+        let timerReconexao = null;
+
+        // Ícones sólidos para ambas as cores para permitir controle via CSS
+        const simbolos = {
+            'branco': { 'rei': '♚', 'rainha': '♛', 'torre': '♜', 'bispo': '♝', 'cavalo': '♞', 'peao': '♟' },
+            'preto': { 'rei': '♚', 'rainha': '♛', 'torre': '♜', 'bispo': '♝', 'cavalo': '♞', 'peao': '♟' }
+        };
+
+        function carregarSessaoLocal() {
+            return {
+                codigoSala: localStorage.getItem(storageKeys.codigoSala) || '',
+                tokenJogador: localStorage.getItem(storageKeys.tokenJogador) || '',
+                papel: localStorage.getItem(storageKeys.papel) || ''
+            };
+        }
+
+        function salvarSessaoLocal(codigoSala, papel, tokenJogador) {
+            if (codigoSala) {
+                localStorage.setItem(storageKeys.codigoSala, codigoSala);
+            } else {
+                localStorage.removeItem(storageKeys.codigoSala);
+            }
+
+            if (papel) {
+                localStorage.setItem(storageKeys.papel, papel);
+            } else {
+                localStorage.removeItem(storageKeys.papel);
+            }
+
+            if (tokenJogador) {
+                localStorage.setItem(storageKeys.tokenJogador, tokenJogador);
+            } else {
+                localStorage.removeItem(storageKeys.tokenJogador);
+            }
+        }
+
+        function atualizarPillConexao(texto, online = false) {
+            const pill = document.getElementById('status-conexao');
+            pill.innerText = texto;
+            pill.className = online ? 'conexao-pill online' : 'conexao-pill';
+        }
+
+        function enviarSocket(dados) {
+            const payload = JSON.stringify(dados);
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(payload);
+                return;
+            }
+
+            filaMensagens.push(payload);
+        }
+
+        function enviarFilaPendentes() {
+            while (filaMensagens.length > 0 && socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(filaMensagens.shift());
+            }
+        }
+
+        function solicitarEntradaAutomatica() {
+            const sessao = carregarSessaoLocal();
+
+            if (!sessao.codigoSala) {
+                return;
+            }
+
+            enviarSocket({
+                acao: 'ENTRAR_SALA',
+                codigoSala: sessao.codigoSala,
+                tokenJogador: sessao.tokenJogador || undefined,
+                forcarEspectador: sessao.papel === 'espectador'
+            });
+        }
+
+        function conectarSocket() {
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = () => {
+                document.getElementById('status').innerText = 'Online 🟢';
+                document.getElementById('status').style.color = '#50fa7b';
+                atualizarPillConexao('Conectado', true);
+
+                if (timerReconexao) {
+                    clearTimeout(timerReconexao);
+                    timerReconexao = null;
+                }
+
+                const haviaFilaPendentes = filaMensagens.length > 0;
+                enviarFilaPendentes();
+
+                if (!haviaFilaPendentes) {
+                    solicitarEntradaAutomatica();
+                }
+            };
+
+            socket.onmessage = (evento) => {
+                const dados = JSON.parse(evento.data);
+
+                if (dados.acao === 'CONEXAO_ESTABELECIDA') {
+                    atualizarStatusSala('Conexão estabelecida. Crie ou entre em uma sala.');
+                    return;
+                }
+
+                if (dados.acao === 'ERRO_SALA') {
+                    atualizarStatusSala(dados.mensagem || 'Não foi possível entrar na sala.');
+                    return;
+                }
+
+                if (dados.acao === 'SALA_ATRIBUIDA') {
+                    codigoSalaAtual = dados.sala.codigo;
+                    papelAtual = dados.sala.papel;
+                    tokenJogadorAtual = dados.sala.tokenJogador || '';
+
+                    salvarSessaoLocal(codigoSalaAtual, papelAtual, tokenJogadorAtual);
+                    document.getElementById('sala-atual').innerText = codigoSalaAtual;
+                    document.getElementById('papel-atual').innerText = formatarPapel(papelAtual);
+                    document.getElementById('codigo-sala').value = codigoSalaAtual;
+                    atualizarStatusSala(`Você entrou na sala ${codigoSalaAtual} como ${formatarPapel(papelAtual)}.`);
+                    return;
+                }
+
+                if (dados.acao === 'ESTADO_ATUALIZADO') {
+                    tabuleiroAtual = dados.estado.tabuleiro;
+                    turnoAtual = dados.estado.turno;
+                    maoAtual = dados.estado.maoAtual || [];
+                    papelAtual = dados.estado.papel || papelAtual;
+                    movimentosDestacados = [];
+                    selecao = null;
+                    cartaAtiva = null;
+                    origemCarta = null;
+
+                    document.getElementById('pontos-branco').innerText = dados.estado.placar.branco;
+                    document.getElementById('pontos-preto').innerText = dados.estado.placar.preto;
+
+                    document.getElementById('sala-atual').innerText = dados.estado.codigoSala;
+                    document.getElementById('papel-atual').innerText = formatarPapel(dados.estado.papel);
+                    atualizarStatusSala(criarResumoSala(dados.estado));
+
+                    atualizarPainel();
+                    atualizarMensagemCarta();
+                    renderizarCartas();
+                    renderizarTabuleiro();
+                    return;
+                }
+
+                if (dados.acao === 'MOVIMENTOS_PERMITIDOS') {
+                    movimentosDestacados = dados.movimentos;
+                    renderizarTabuleiro();
+                }
+            };
+
+            socket.onclose = () => {
+                document.getElementById('status').innerText = 'Desconectado 🔴';
+                document.getElementById('status').style.color = '#ff5555';
+                atualizarPillConexao('Reconectando...');
+
+                if (carregarSessaoLocal().codigoSala) {
+                    atualizarStatusSala('Conexão perdida. Tentando reconectar à mesma sala...');
+
+                    if (!timerReconexao) {
+                        timerReconexao = setTimeout(() => {
+                            timerReconexao = null;
+                            conectarSocket();
+                        }, 1500);
+                    }
+                } else {
+                    atualizarStatusSala('Conexão encerrada.');
+                }
+            };
+
+            socket.onerror = () => {
+                atualizarStatusSala('Erro de conexão com o servidor.');
+            };
+        }
+
+        conectarSocket();
+
+        function atualizarPainel() {
+            const indicador = document.getElementById('indicador-turno');
+            indicador.innerText = `Turno: ${turnoAtual}`;
+            indicador.className = `turno-badge turno-${turnoAtual}`;
+        }
+
+        function formatarPapel(papel) {
+            if (papel === 'branco') return 'Jogador Branco';
+            if (papel === 'preto') return 'Jogador Preto';
+            if (papel === 'espectador') return 'Espectador';
+            return 'Desconhecido';
+        }
+
+        function criarResumoSala(estado) {
+            const jogadores = estado.jogadores || {};
+            const brancas = jogadores.branco?.conectado ? 'Branco online' : 'Branco aguardando';
+            const pretas = jogadores.preto?.conectado ? 'Preto online' : 'Preto aguardando';
+            const cartasBranco = jogadores.branco?.maoTamanho ?? 0;
+            const cartasPreto = jogadores.preto?.maoTamanho ?? 0;
+            const espectadores = estado.espectadoresConectados || 0;
+
+            return `${brancas} | ${pretas} | Cartas: ${cartasBranco}/${cartasPreto} | ${espectadores} espectador(es)`;
+        }
+
+        function atualizarStatusSala(texto) {
+            document.getElementById('status-sala').innerText = texto;
+        }
+
+        function atualizarMensagemCarta() {
+            const mensagem = document.getElementById('mensagem-carta');
+
+            if (papelAtual === 'espectador') {
+                mensagem.innerText = 'Você está como espectador nesta sala.';
+                return;
+            }
+
+            if (!cartaAtiva) {
+                mensagem.innerText = 'Selecione uma carta para ativar um efeito especial.';
+                return;
+            }
+
+            const carta = maoAtual.find(item => item.id === cartaAtiva);
+            if (!carta) {
+                mensagem.innerText = 'Selecione uma carta para ativar um efeito especial.';
+                return;
+            }
+
+            if (carta.id === 'reviver_aliado') {
+                mensagem.innerText = origemCarta
+                    ? 'Agora escolha uma casa vazia adjacente para reviver a peça.'
+                    : 'Selecione um bispo para reviver uma peça capturada.';
+                return;
+            }
+
+            if (carta.id === 'marcha_lateral') {
+                mensagem.innerText = 'Selecione um peão para receber movimento horizontal.';
+                return;
+            }
+
+            if (carta.id === 'salto_cavaleiro') {
+                mensagem.innerText = 'Selecione qualquer peça para ganhar um salto em L.';
+                return;
+            }
+        }
+
+        function renderizarCartas() {
+            const container = document.getElementById('cartas-container');
+            container.innerHTML = '';
+
+            if (papelAtual === 'espectador') {
+                container.innerHTML = '<div class="estado-vazio">Espectadores não possuem mão de cartas.</div>';
+                return;
+            }
+
+            if (maoAtual.length === 0) {
+                container.innerHTML = '<div class="estado-vazio">Sem cartas disponíveis nesta mão.</div>';
+                return;
+            }
+
+            maoAtual.forEach(carta => {
+                const botao = document.createElement('button');
+                botao.type = 'button';
+                botao.className = `carta-item ${cartaAtiva === carta.id ? 'carta-ativa' : ''}`;
+                botao.innerHTML = `
+                    <strong>${carta.nome}</strong>
+                    <span>${carta.descricao}</span>
+                `;
+                botao.onclick = () => ativarCarta(carta.id);
+                container.appendChild(botao);
+            });
+        }
+
+        function ativarCarta(cartaId) {
+            if (papelAtual === 'espectador' || papelAtual !== turnoAtual) {
+                atualizarStatusSala('Espere sua vez para usar cartas.');
+                return;
+            }
+
+            if (cartaAtiva === cartaId) {
+                limparModoCarta();
+                return;
+            }
+
+            cartaAtiva = cartaId;
+            origemCarta = null;
+            selecao = null;
+            movimentosDestacados = [];
+            atualizarMensagemCarta();
+            renderizarCartas();
+            renderizarTabuleiro();
+        }
+
+        function limparModoCarta() {
+            cartaAtiva = null;
+            origemCarta = null;
+            selecao = null;
+            movimentosDestacados = [];
+            atualizarMensagemCarta();
+            renderizarCartas();
+            renderizarTabuleiro();
+        }
+
+        function renderizarTabuleiro() {
+            const divTabuleiro = document.getElementById('tabuleiro');
+            divTabuleiro.innerHTML = '';
+
+            for (let linha = 0; linha < 8; linha++) {
+                for (let coluna = 0; coluna < 8; coluna++) {
+                    const divCasa = document.createElement('div');
+                    divCasa.className = 'casa ' + ((linha + coluna) % 2 === 0 ? 'clara' : 'escura');
+
+                    if (selecao && selecao.linha === linha && selecao.coluna === coluna) {
+                        divCasa.classList.add('selecionada');
+                    }
+
+                    const ehDestinoValido = movimentosDestacados.some(m => m.linha === linha && m.coluna === coluna);
+                    if (ehDestinoValido) {
+                        divCasa.classList.add('destino-valido');
+                    }
+
+                    divCasa.dataset.linha = linha;
+                    divCasa.dataset.coluna = coluna;
+
+                    const peca = tabuleiroAtual[linha][coluna];
+                    if (peca) {
+                        divCasa.innerText = simbolos[peca.cor][peca.tipo];
+                        divCasa.style.color = peca.cor === 'branco' ? '#ffffff' : '#000000';
+
+                        if (peca.cor === 'branco') {
+                            divCasa.style.textShadow = '0px 0px 5px rgba(0,0,0,0.8)';
+                        }
+
+                        if (peca.modificadores?.length > 0) {
+                            divCasa.classList.add('peca-modificada');
+                            if (peca.modificadores.includes('marcha_lateral')) {
+                                divCasa.classList.add('buff-marcha');
+                            }
+                            if (peca.modificadores.includes('salto_cavaleiro')) {
+                                divCasa.classList.add('buff-salto');
+                            }
+                        }
+
+                        divCasa.title = peca.modificadores?.length
+                            ? `${peca.tipo} com ${peca.modificadores.join(', ')}`
+                            : `${peca.tipo}`;
+                    }
+
+                    divCasa.onclick = () => lidarComClique(linha, coluna, peca);
+                    divTabuleiro.appendChild(divCasa);
+                }
+            }
+        }
+
+        function lidarComClique(linha, coluna, peca) {
+            if (papelAtual === 'espectador') {
+                return;
+            }
+
+            if (papelAtual !== turnoAtual) {
+                atualizarStatusSala('Aguardando a vez do outro jogador.');
+                return;
+            }
+
+            if (cartaAtiva) {
+                const carta = maoAtual.find(item => item.id === cartaAtiva);
+
+                if (!carta) {
+                    limparModoCarta();
+                    return;
+                }
+
+                if (carta.id === 'reviver_aliado') {
+                    if (!origemCarta) {
+                        if (peca && peca.cor === turnoAtual && peca.tipo === 'bispo') {
+                            origemCarta = { linha, coluna };
+                            selecao = origemCarta;
+                            socket.send(JSON.stringify({ acao: 'PEDIR_MOVIMENTOS_VALIDOS', origem: origemCarta, cartaId: 'reviver_aliado' }));
+                            atualizarMensagemCarta();
+                            renderizarTabuleiro();
+                        }
+                        return;
+                    }
+
+                    const ehDestinoValido = movimentosDestacados.some(m => m.linha === linha && m.coluna === coluna);
+                    if (ehDestinoValido && !peca) {
+                        socket.send(JSON.stringify({
+                            acao: 'USAR_CARTA',
+                            cartaId: carta.id,
+                            origem: origemCarta,
+                            destino: { linha, coluna }
+                        }));
+                    }
+                    return;
+                }
+
+                if (carta.id === 'marcha_lateral') {
+                    if (peca && peca.cor === turnoAtual && peca.tipo === 'peao') {
+                        selecao = { linha, coluna };
+                        socket.send(JSON.stringify({
+                            acao: 'USAR_CARTA',
+                            cartaId: carta.id,
+                            origem: selecao
+                        }));
+                    }
+                    return;
+                }
+
+                if (carta.id === 'salto_cavaleiro') {
+                    if (peca && peca.cor === turnoAtual) {
+                        selecao = { linha, coluna };
+                        socket.send(JSON.stringify({
+                            acao: 'USAR_CARTA',
+                            cartaId: carta.id,
+                            origem: selecao
+                        }));
+                    }
+                    return;
+                }
+            }
+
+            // CORREÇÃO DE SELEÇÃO: 
+            // Se já tenho uma peça selecionada, mas clico em OUTRA peça da MINHA cor, eu mudo a seleção.
+            if (selecao && peca && peca.cor === turnoAtual) {
+                selecao = { linha, coluna };
+                socket.send(JSON.stringify({ acao: 'PEDIR_MOVIMENTOS_VALIDOS', origem: selecao }));
+                renderizarTabuleiro();
+                return;
+            }
+
+            if (!selecao) {
+                if (peca && peca.cor === turnoAtual) { 
+                    selecao = { linha, coluna };
+                    socket.send(JSON.stringify({ acao: 'PEDIR_MOVIMENTOS_VALIDOS', origem: selecao }));
+                    renderizarTabuleiro();
+                }
+            } else {
+                // Tenta o movimento
+                socket.send(JSON.stringify({
+                    acao: 'TENTATIVA_MOVIMENTO',
+                    origem: selecao,
+                    destino: { linha, coluna }
+                }));
+                // A limpeza da seleção e dos destaques ocorrerá quando o servidor responder com ESTADO_ATUALIZADO
+            }
+        }
+
+        function criarSala() {
+            const codigo = document.getElementById('codigo-sala').value.trim().toUpperCase();
+            enviarSocket({ acao: 'CRIAR_SALA', codigoSala: codigo || undefined });
+        }
+
+        function entrarSala() {
+            const codigo = document.getElementById('codigo-sala').value.trim().toUpperCase();
+
+            if (!codigo) {
+                atualizarStatusSala('Digite um código de sala para entrar.');
+                return;
+            }
+
+            const sessao = carregarSessaoLocal();
+
+            enviarSocket({
+                acao: 'ENTRAR_SALA',
+                codigoSala: codigo,
+                tokenJogador: sessao.codigoSala === codigo ? sessao.tokenJogador || undefined : undefined,
+                forcarEspectador: false
+            });
+        }
+
+        document.getElementById('cancelar-carta').onclick = () => limparModoCarta();
+        document.getElementById('criar-sala').onclick = () => criarSala();
+        document.getElementById('entrar-sala').onclick = () => entrarSala();
+    </script>
+</body>
+
+</html>
