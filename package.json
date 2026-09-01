@@ -2,11 +2,19 @@
   "name": "crazy-chess",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "backend/dist/index.js",
   "scripts": {
-    "start": "node server.js",
-     "dev": "npx concurrently \"node server.js\" \"cd frontend && npm run dev\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node backend/dist/index.js",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "tsx watch backend/src/index.ts",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm run build:backend && npm --prefix frontend run build",
+    "build:backend": "tsc -p backend/tsconfig.json",
+    "test": "tsx --test backend/test/**/*.test.ts",
+    "coverage": "c8 --reporter=text --reporter=json --all --extension=.ts tsx --test backend/test/**/*.test.ts",
+    "test:integration": "tsx --test backend/test/**/*.integration.test.ts",
+    "db:generate": "drizzle-kit generate --config backend/drizzle.config.ts",
+    "db:migrate": "tsx backend/src/modules/persistence/migrate.ts"
   },
   "repository": {
     "type": "git",
@@ -15,14 +23,31 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/rangelro/Crazy-Chess/issues"
   },
   "homepage": "https://github.com/rangelro/Crazy-Chess#readme",
   "dependencies": {
+    "bcrypt": "^6.0.0",
+    "drizzle-orm": "^0.44.7",
     "express": "^5.2.1",
-    "sqlite3": "^6.0.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.16.3",
     "ws": "^8.20.0"
-  }
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.3.0",
+    "@types/pg": "^8.15.5",
+    "@types/ws": "^8.18.1",
+    "c8": "^10.1.3",
+    "concurrently": "^10.0.5",
+    "drizzle-kit": "^0.31.4",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "allowScripts": {}
 }

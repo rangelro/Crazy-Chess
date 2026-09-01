@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: crazy_chess
+      POSTGRES_USER: crazy_chess
+      POSTGRES_PASSWORD: crazy_chess
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crazy_chess -d crazy_chess"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  app:
+    build: .
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://crazy_chess:crazy_chess@postgres:5432/crazy_chess
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-compose-access-secret-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-compose-refresh-secret-change-me}
+    ports: ["3001:3000"]
+    depends_on:
+      postgres:
+        condition: service_healthy

@@ -1,250 +1,576 @@
 .container {
-  width: 100%;
-  min-height: 100vh;
-  background-color: var(--color-gray-100);
-  padding: var(--spacing-lg);
+  --game-bg: #080b0f;
+  --game-surface: rgba(17, 22, 28, 0.66);
+  --game-surface-strong: rgba(20, 26, 33, 0.86);
+  --game-line: rgba(222, 208, 181, 0.14);
+  --game-text: #e8e1d4;
+  --game-muted: #9b9a94;
+  --game-brass: #c9a86a;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  color: var(--game-text);
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(59, 76, 67, 0.18) 0%, rgba(8, 11, 15, 0) 54%),
+    var(--game-bg);
+  padding: clamp(0.65rem, 1.35vw, 1.25rem);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
 
 .gameContainer {
-  max-width: 1400px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(9.5rem, 0.24fr) minmax(0, 1fr) minmax(13rem, 0.3fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "header header header"
+    "match board hand";
+  gap: clamp(0.6rem, 1.2vw, 1.1rem);
 }
 
 .loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  font-size: var(--font-size-lg);
-  color: var(--color-gray-600);
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--game-muted);
+  letter-spacing: 0.08em;
 }
 
 .header {
-  display: flex;
+  grid-area: header;
+  min-height: 2.75rem;
+  display: grid;
+  grid-template-columns: minmax(9rem, 1fr) auto minmax(9rem, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-lg);
-  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.1;
+}
+
+.identity strong {
+  overflow: hidden;
+  color: var(--game-text);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1rem, 1.3vw, 1.25rem);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eyebrow,
+.panelLabel {
+  color: var(--game-brass);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .playerInfo {
   display: flex;
-  gap: var(--spacing-md);
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.5rem, 1vw, 1rem);
+}
+
+.playerBadge,
+.connectionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #c8c5bd;
+  font-size: clamp(0.68rem, 0.8vw, 0.8rem);
+  white-space: nowrap;
+}
+
+.pieceColor,
+.connectionBadge i {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.pieceColorLight {
+  background: #e7d8bb;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.pieceColorDark {
+  background: #252a31;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+.connectionBadge i {
+  background: #9a7045;
+  box-shadow: 0 0 0 3px rgba(154, 112, 69, 0.14);
+}
+
+.connectionBadge.connected i {
+  background: #6fa783;
+  box-shadow: 0 0 0 3px rgba(111, 167, 131, 0.13);
+}
+
+.exitButton {
+  justify-self: end;
+  padding: 0.48rem 0.85rem;
+  border: 1px solid rgba(225, 146, 132, 0.28);
+  border-radius: 999px;
+  color: #dba197;
+  background: rgba(94, 34, 31, 0.08);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.exitButton:hover {
+  color: #ffe8e3;
+  border-color: rgba(225, 146, 132, 0.56);
+  background: rgba(115, 46, 41, 0.22);
+}
+
+.exitButton:focus-visible,
+.handCard:focus-visible {
+  outline: 2px solid var(--game-brass);
+  outline-offset: 3px;
 }
 
 .boardContainer {
-  flex: 1;
-}
-
-.board {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--color-white);
-  min-height: 640px;
+  grid-area: board;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+  container-type: size;
 }
 
 .tabuleiro {
-  width: min(92vw, 680px);
-  height: min(92vw, 680px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(145deg, #173825 0%, #2a5a3c 100%);
-  padding: var(--spacing-md);
-  border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow-xl);
+  width: min(100%, 62rem);
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 1.28 / 1;
+}
+
+@supports (width: 1cqw) {
+  .tabuleiro {
+    width: min(100cqw, calc(100cqh * 1.28), 62rem);
+  }
+}
+
+.fallbackNotice {
+  position: absolute;
+  right: 0.55rem;
+  bottom: 0.4rem;
+  margin: 0;
+  color: rgba(232, 225, 212, 0.58);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .placeholder {
-  text-align: center;
-  padding: var(--spacing-3xl);
-}
-
-.chessBoard {
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  grid-template-rows: repeat(8, 1fr);
-  border-radius: var(--border-radius-md);
-  overflow: hidden;
-  border: 4px solid rgba(255, 255, 255, 0.14);
+  place-items: center;
+  color: var(--game-muted);
+  font-size: 0.84rem;
 }
 
-.casa {
-  position: relative;
-  width: 100%;
-  height: 100%;
+.panel {
+  align-self: center;
+  min-width: 0;
+  max-height: 100%;
+  padding: clamp(0.75rem, 1.4vw, 1.1rem);
+  border: 1px solid var(--game-line);
+  border-radius: 0.9rem;
+  background: linear-gradient(145deg, rgba(28, 34, 41, 0.58), rgba(12, 16, 21, 0.42));
+  box-shadow: 0 1.2rem 4rem rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.matchPanel {
+  grid-area: match;
+}
+
+.handPanel {
+  grid-area: hand;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.panelHeading {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast);
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.coordRank {
-  position: absolute;
-  top: 4px;
-  left: 6px;
-  font-size: clamp(0.62rem, 0.8vw, 0.82rem);
-  font-weight: var(--font-weight-bold);
-  color: rgba(31, 41, 55, 0.78);
-  user-select: none;
-}
-
-.coordFile {
-  position: absolute;
-  right: 6px;
-  bottom: 4px;
-  font-size: clamp(0.62rem, 0.8vw, 0.82rem);
-  font-weight: var(--font-weight-bold);
-  color: rgba(31, 41, 55, 0.78);
-  user-select: none;
-}
-
-.casa:hover {
-  filter: brightness(1.04);
-}
-
-.light {
-  background-color: #f7efe0;
-}
-
-.dark {
-  background-color: #9f7b4e;
-}
-
-.selected {
-  box-shadow: inset 0 0 0 4px #1f2937;
-}
-
-.possibleMove {
-  box-shadow: inset 0 0 0 3px rgba(16, 185, 129, 0.9);
-}
-
-.peca {
-  position: relative;
-  z-index: 2;
-  font-size: clamp(1.4rem, 3vw, 2.6rem);
-  line-height: 1;
-  user-select: none;
-  transition: transform var(--transition-fast);
-}
-
-.casa:hover .peca {
-  transform: scale(1.08);
-}
-
-.whitePiece {
-  color: #ffffff;
-  text-shadow: -1px -1px 0 #1f2937, 1px -1px 0 #1f2937, -1px 1px 0 #1f2937, 1px 1px 0 #1f2937;
-}
-
-.blackPiece {
-  color: #111827;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
-}
-
-.moveDot {
-  position: absolute;
-  width: clamp(10px, 1.3vw, 16px);
-  height: clamp(10px, 1.3vw, 16px);
-  border-radius: 999px;
-  background-color: rgba(16, 185, 129, 0.85);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8);
-}
-
-.gameInfo {
+.cardCount {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: var(--spacing-lg);
+  width: 1.45rem;
+  height: 1.45rem;
+  place-items: center;
+  border: 1px solid rgba(201, 168, 106, 0.3);
+  border-radius: 50%;
+  color: var(--game-brass);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.67rem;
+}
+
+.matchDetails {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.matchDetails div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.matchDetails dt {
+  color: var(--game-muted);
+  font-size: 0.72rem;
+}
+
+.matchDetails dd {
+  overflow: hidden;
+  color: #d2cec5;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matchDetails .yourTurn {
+  color: #9bc5a9;
 }
 
 .handGrid {
   display: grid;
-  gap: var(--spacing-sm);
-  grid-template-columns: 1fr;
+  gap: 0.55rem;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-color: rgba(201, 168, 106, 0.35) transparent;
+  scrollbar-width: thin;
 }
 
 .handCard {
   width: 100%;
-  text-align: left;
-  border: 2px solid var(--color-gray-200);
-  border-radius: var(--border-radius-md);
-  padding: var(--spacing-md);
-  background: var(--color-white);
+  min-height: 4.1rem;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
-  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  gap: 0.24rem;
+  padding: 0.72rem 0.78rem;
+  border: 1px solid rgba(232, 225, 212, 0.1);
+  border-radius: 0.65rem;
+  color: var(--game-text);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.025);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
 .handCard:hover {
-  border-color: var(--color-primary);
   transform: translateY(-1px);
+  border-color: rgba(201, 168, 106, 0.36);
+  background: rgba(201, 168, 106, 0.06);
 }
 
 .handCard strong {
-  color: var(--color-primary-dark);
+  color: #ddd4c3;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .handCard span {
-  color: var(--color-gray-700);
-  font-size: var(--font-size-sm);
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--game-muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .handCardActive {
-  border-color: var(--color-secondary-dark);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.28);
+  border-color: rgba(201, 168, 106, 0.72);
+  background: rgba(201, 168, 106, 0.11);
+  box-shadow: inset 3px 0 0 var(--game-brass), 0 0 1.8rem rgba(201, 168, 106, 0.07);
 }
 
 .cardActions {
-  margin-top: var(--spacing-md);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: 0.5rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--game-line);
+}
+
+.cardActions p,
+.emptyHand {
+  margin: 0;
+  color: var(--game-muted);
+  font-size: 0.72rem;
+}
+
+.cardActions strong {
+  color: #d8c395;
+}
+
+.handPanel .applyButton {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(201, 168, 106, 0.45);
+  color: #e3d4b6;
+  background: rgba(201, 168, 106, 0.08);
+  box-shadow: none;
+}
+
+.handPanel .applyButton:hover:not(:disabled) {
+  background: rgba(201, 168, 106, 0.16);
+  box-shadow: none;
+}
+
+.errorMessage {
+  margin: 0.9rem 0 0;
+  padding: 0.6rem;
+  border-left: 2px solid #cb7469;
+  color: #e5a59d;
+  background: rgba(126, 44, 39, 0.11);
+  font-size: 0.7rem;
+  line-height: 1.4;
 }
 
 .reviveOptions {
-  padding: var(--spacing-lg);
+  padding: 0.25rem;
+  color: #d9d5cd;
 }
 
 .optionsList {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: 0.7rem;
 }
 
-.errorMessage {
-  margin-top: var(--spacing-sm);
-  color: var(--color-error);
-  font-weight: var(--font-weight-semibold);
+.reviveOptions .reviveButton {
+  border: 1px solid rgba(201, 168, 106, 0.4);
+  color: #e3d4b6;
+  background: rgba(201, 168, 106, 0.08);
+  box-shadow: none;
 }
 
-@media (max-width: 768px) {
+.reviveOptions .reviveButton:hover:not(:disabled) {
+  background: rgba(201, 168, 106, 0.16);
+  box-shadow: none;
+}
+
+@media (max-width: 1100px) {
+  .gameContainer {
+    grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+    grid-template-rows: auto minmax(0, 1fr) clamp(5.5rem, 17vh, 8rem);
+    grid-template-areas:
+      "header header"
+      "board board"
+      "match hand";
+  }
+
+  .panel {
+    width: 100%;
+    height: 100%;
+    align-self: stretch;
+    padding: 0.65rem 0.8rem;
+  }
+
+  .matchDetails {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin-top: 0.55rem;
+  }
+
+  .matchDetails div {
+    display: grid;
+    gap: 0.1rem;
+  }
+
+  .handPanel {
+    position: relative;
+    gap: 0.45rem;
+  }
+
+  .handGrid {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(9.5rem, 1fr);
+    grid-template-rows: 1fr;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .handCard {
+    min-height: 3.35rem;
+    padding: 0.5rem 0.62rem;
+  }
+
+  .cardActions {
+    position: absolute;
+    right: 1rem;
+    bottom: calc(100% + 0.65rem);
+    padding: 0.55rem;
+    border: 1px solid var(--game-line);
+    border-radius: 0.65rem;
+    background: var(--game-surface-strong);
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 0.55rem;
+  }
+
+  .gameContainer {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "header"
+      "board"
+      "match"
+      "hand";
+    gap: 0.45rem;
+  }
+
   .header {
-    flex-direction: column;
-    align-items: stretch;
+    min-height: 2.4rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.55rem;
+  }
+
+  .identity strong {
+    font-size: 0.9rem;
   }
 
   .playerInfo {
-    flex-direction: column;
+    position: absolute;
+    top: 0.72rem;
+    left: 50%;
+    transform: translateX(-50%);
   }
 
-  .board {
-    min-height: 460px;
+  .playerBadge {
+    display: none;
+  }
+
+  .connectionBadge {
+    font-size: 0.62rem;
+  }
+
+  .exitButton {
+    grid-column: 2;
+    padding: 0.38rem 0.66rem;
+    font-size: 0.68rem;
   }
 
   .tabuleiro {
-    width: min(94vw, 520px);
-    height: min(94vw, 520px);
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1.08 / 1;
   }
 
+  .panel {
+    border-radius: 0.68rem;
+    backdrop-filter: blur(10px);
+  }
+
+  .matchPanel {
+    min-height: 3.6rem;
+  }
+
+  .matchDetails {
+    margin-top: 0.3rem;
+  }
+
+  .matchDetails dt,
+  .matchDetails dd {
+    font-size: 0.63rem;
+  }
+
+  .handPanel {
+    min-height: 5.4rem;
+    max-height: 7.3rem;
+  }
+
+  .handCard {
+    min-height: 3rem;
+  }
+
+  .handCard strong {
+    font-size: 0.78rem;
+  }
+
+  .handCard span {
+    font-size: 0.61rem;
+    -webkit-line-clamp: 1;
+  }
+}
+
+@media (max-height: 620px) and (orientation: landscape) {
   .container {
-    padding: var(--spacing-md);
+    padding: 0.45rem;
+  }
+
+  .gameContainer {
+    grid-template-columns: minmax(8rem, 0.23fr) minmax(0, 1fr) minmax(11rem, 0.3fr);
+    grid-template-rows: 2.2rem minmax(0, 1fr);
+    grid-template-areas:
+      "header header header"
+      "match board hand";
+    gap: 0.45rem;
+  }
+
+  .panel {
+    width: auto;
+    height: auto;
+    padding: 0.55rem;
+  }
+
+  .matchDetails {
+    grid-template-columns: 1fr;
+  }
+
+  .handGrid {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-rows: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .cardActions {
+    position: static;
+    border-width: 1px 0 0;
+    border-radius: 0;
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exitButton,
+  .handCard {
+    transition: none;
   }
 }

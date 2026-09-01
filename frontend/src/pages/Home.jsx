@@ -6,12 +6,14 @@ import Card, { CardBody } from '../components/Card';
 import Input from '../components/Input';
 import { socketService } from '../services/socket';
 import { storageService } from '../services/storage';
+import { useAuth } from '../auth/AuthContext';
 
 export default function Home() {
   const navigate = useNavigate();
   const [codigoSala, setCodigoSala] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { user, logout } = useAuth();
 
   const handleCriarSala = async () => {
     setLoading(true);
@@ -80,6 +82,7 @@ export default function Home() {
         <div className={styles.header}>
           <h1>♟ Crazy Chess ♟</h1>
           <p>Uma nova forma de jogar xadrez</p>
+          <p>Jogando como <strong>{user?.nome}</strong> · <button type="button" onClick={logout}>Sair</button></p>
         </div>
 
         <Card className={styles.card}>

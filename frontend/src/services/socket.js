@@ -1,4 +1,5 @@
 let ws = null;
+import { authService } from './auth';
 let connectPromise = null;
 let reconnectAttempts = 0;
 let lastUrl = null;
@@ -58,6 +59,8 @@ export const socketService = {
           console.log('WebSocket conectado');
           reconnectAttempts = 0;
           connectPromise = null;
+          const token = authService.token();
+          if (token) ws.send(JSON.stringify({ acao: 'AUTENTICAR', token }));
           resolve(ws);
         };
 

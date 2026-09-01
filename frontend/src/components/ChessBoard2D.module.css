@@ -1,0 +1,8 @@
+.board { width: auto; max-width: 100%; height: 100%; margin: 0 auto; aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); overflow: hidden; box-shadow: 0 1.5rem 4rem rgba(0,0,0,.38); }
+.square { position: relative; display: grid; place-items: center; border: 0; cursor: pointer; }
+.square:disabled { cursor: wait; }
+.light { background: #c8b28e; }.dark { background: #5b4030; }
+.selected { box-shadow: inset 0 0 0 4px #e2bd72; }.destination { box-shadow: inset 0 0 0 3px #79bd90; }
+.piece { position: relative; z-index: 1; font-size: clamp(1.4rem, 4.5vmin, 3.1rem); line-height: 1; }.whitePiece { color: #e3d3b3; text-shadow: -1px -1px #4c4033, 1px 2px 4px rgba(0,0,0,.58); }.blackPiece { color: #171c22; text-shadow: 0 1px 1px rgba(255,255,255,.18), 1px 2px 4px rgba(0,0,0,.48); }
+.rank,.file { position: absolute; font-family: Consolas, monospace; font-weight: 700; font-size: clamp(.55rem,.8vw,.75rem); color: rgba(16,18,20,.66); }.rank { top: 4px; left: 6px; }.file { right: 6px; bottom: 4px; }
+.dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #79bd90; box-shadow: 0 0 0 3px rgba(8,11,15,.38); }

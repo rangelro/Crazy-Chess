@@ -2,41 +2,14 @@ import styles from './Game.module.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Button from '../components/Button';
-import Card, { CardBody } from '../components/Card';
-import Badge from '../components/Badge';
 import Modal from '../components/Modal';
+import ChessBoard2D from '../components/ChessBoard2D';
+import ChessBoard3D from '../components/ChessBoard3D';
 import { socketService } from '../services/socket';
 import { storageService } from '../services/storage';
 
-const PIECE_SYMBOL = {
-  branco: {
-    rei: '♔',
-    rainha: '♕',
-    torre: '♖',
-    bispo: '♗',
-    cavalo: '♘',
-    peao: '♙',
-  },
-  preto: {
-    rei: '♚',
-    rainha: '♛',
-    torre: '♜',
-    bispo: '♝',
-    cavalo: '♞',
-    peao: '♟',
-  },
-};
-
 function keyCasa(casa) {
   return `${casa.linha}-${casa.coluna}`;
-}
-
-function toFile(coluna) {
-  return 'abcdefgh'[coluna] || '?';
-}
-
-function toRank(linha) {
-  return String(8 - linha);
 }
 
 export default function Game() {
@@ -54,6 +27,8 @@ export default function Game() {
   const [erroJogo, setErroJogo] = useState('');
   const [cartaSelecionada, setCartaSelecionada] = useState(null);
   const [reviveDestinoPendente, setReviveDestinoPendente] = useState(null);
+  const [threeUnavailable, setThreeUnavailable] = useState(false);
+  const [promocaoPendente, setPromocaoPendente] = useState(null);
 
   useEffect(() => {
     // Pegar dados da sessão ou da navegação
@@ -93,6 +68,8 @@ export default function Game() {
           if ((message.opcoesReviviveis || []).length > 0) {
             setShowReviveModal(true);
           }
+        } else if (message.action === 'PROMOCAO_PENDENTE') {
+          setPromocaoPendente({ origem: message.origem, destino: message.destino, opcoes: message.opcoes || [] });
         }
       });
     });
@@ -111,14 +88,9 @@ export default function Game() {
     navigate('/');
   };
 
-  const ehMeuTurno = sala?.turno === jogadorCor;
+  const partidaEncerrada = sala?.resultado?.estado && !['em_andamento', 'xeque'].includes(sala.resultado.estado);
+  const ehMeuTurno = sala?.turno === jogadorCor && !partidaEncerrada;
   const minhaMao = sala?.maoAtual || [];
-  const linhasExibicao = jogadorCor === 'preto'
-    ? [7, 6, 5, 4, 3, 2, 1, 0]
-    : [0, 1, 2, 3, 4, 5, 6, 7];
-  const colunasExibicao = jogadorCor === 'preto'
-    ? [7, 6, 5, 4, 3, 2, 1, 0]
-    : [0, 1, 2, 3, 4, 5, 6, 7];
 
   const solicitarMovimentos = async (origem, cartaId = null) => {
     setErroJogo('');
@@ -205,6 +177,14 @@ export default function Game() {
     setMovimentosPermitidos([]);
   };
 
+  const confirmarPromocao = (promocao) => {
+    if (!promocaoPendente) return;
+    socketService.send('TENTATIVA_MOVIMENTO', { ...promocaoPendente, promocao });
+    setPromocaoPendente(null);
+    setCasaSelecionada(null);
+    setMovimentosPermitidos([]);
+  };
+
   const handleClickCasa = (linha, coluna) => {
     if (!sala || !sala.tabuleiro) {
       return;
@@ -240,60 +220,23 @@ export default function Game() {
     solicitarMovimentos({ linha, coluna }, cartaSelecionada?.id || null);
   };
 
-  const renderizarCasa = (linha, coluna, mostrarRank, mostrarFile) => {
-    const peca = sala?.tabuleiro?.[linha]?.[coluna] || null;
-    const isLight = (linha + coluna) % 2 === 0;
-    const isSelected = casaSelecionada?.linha === linha && casaSelecionada?.coluna === coluna;
-    const isPossibleMove = movimentosPermitidos.some((casa) => casa.linha === linha && casa.coluna === coluna);
-
-    const classes = [styles.casa, isLight ? styles.light : styles.dark];
-    if (isSelected) {
-      classes.push(styles.selected);
-    }
-    if (isPossibleMove) {
-      classes.push(styles.possibleMove);
-    }
-
-    return (
-      <button
-        key={`${linha}-${coluna}`}
-        className={classes.join(' ')}
-        onClick={() => handleClickCasa(linha, coluna)}
-        type="button"
-        disabled={solicitandoMovimentos}
-        aria-label={`Casa ${toFile(coluna)}${toRank(linha)}`}
-      >
-        {mostrarRank && <span className={styles.coordRank}>{toRank(linha)}</span>}
-        {mostrarFile && <span className={styles.coordFile}>{toFile(coluna)}</span>}
-        {peca && (
-          <span className={`${styles.peca} ${peca.cor === 'branco' ? styles.whitePiece : styles.blackPiece}`}>
-            {PIECE_SYMBOL[peca.cor][peca.tipo]}
-          </span>
-        )}
-        {isPossibleMove && <span className={styles.moveDot} />}
-      </button>
-    );
-  };
-
   const renderizarTabuleiro = () => {
     if (!sala?.tabuleiro) {
       return <div className={styles.placeholder}>Aguardando estado da partida...</div>;
     }
 
-    return (
-      <div className={styles.chessBoard}>
-        {linhasExibicao.flatMap((linha, idxLinha) =>
-          colunasExibicao.map((coluna, idxColuna) => (
-            renderizarCasa(
-              linha,
-              coluna,
-              idxColuna === 0,
-              idxLinha === 7
-            )
-          ))
-        )}
-      </div>
-    );
+    const boardProps = {
+      tabuleiro: sala.tabuleiro,
+      jogadorCor,
+      casaSelecionada,
+      movimentosPermitidos,
+      onSquareClick: handleClickCasa,
+      disabled: solicitandoMovimentos || partidaEncerrada,
+    };
+
+    return threeUnavailable
+      ? <ChessBoard2D {...boardProps} />
+      : <ChessBoard3D {...boardProps} onFallback={() => setThreeUnavailable(true)} />;
   };
 
   if (loading) {
@@ -307,87 +250,85 @@ export default function Game() {
   return (
     <div className={styles.container}>
       <div className={styles.gameContainer}>
-        {/* Header */}
         <div className={styles.header}>
-          <div className={styles.playerInfo}>
-            <Badge variant="primary" size="lg">
-              Você: {jogadorCor}
-            </Badge>
-            {oponente && <Badge variant="secondary" size="lg">Oponente: {oponente}</Badge>}
-            {!oponente && <Badge variant="warning" size="lg">Aguardando oponente...</Badge>}
+          <div className={styles.identity}>
+            <span className={styles.eyebrow}>Crazy Chess</span>
+            <strong>{partidaEncerrada ? 'Partida encerrada' : ehMeuTurno ? 'Sua vez de jogar' : 'Aguardando jogada'}</strong>
           </div>
-          <Button variant="danger" onClick={handleSairSala}>
-            Sair da Sala
-          </Button>
+          <div className={styles.playerInfo}>
+            <span className={styles.playerBadge}>
+              <i className={`${styles.pieceColor} ${jogadorCor === 'branco' ? styles.pieceColorLight : styles.pieceColorDark}`} />
+              Você joga de {jogadorCor}
+            </span>
+            <span className={`${styles.connectionBadge} ${oponente ? styles.connected : ''}`}>
+              <i />
+              {oponente ? `Oponente ${oponente}` : 'Aguardando oponente'}
+            </span>
+          </div>
+          <button type="button" className={styles.exitButton} onClick={handleSairSala}>
+            Sair
+          </button>
         </div>
 
-        {/* Game Board */}
-        <Card className={styles.boardContainer}>
-          <CardBody className={styles.board}>
-            <div className={styles.tabuleiro}>
-              {renderizarTabuleiro()}
+        <main className={styles.boardContainer}>
+          <div className={styles.tabuleiro}>
+            {renderizarTabuleiro()}
+          </div>
+          {threeUnavailable && <p className={styles.fallbackNotice}>Modo 2D ativo</p>}
+        </main>
+
+        <aside className={`${styles.panel} ${styles.matchPanel}`}>
+          <span className={styles.panelLabel}>Partida</span>
+          {sala && (
+            <dl className={styles.matchDetails}>
+              <div><dt>Sala</dt><dd>{sala.codigoSala}</dd></div>
+              <div><dt>Turno</dt><dd>{sala.turno}</dd></div>
+              <div><dt>Estado</dt><dd className={ehMeuTurno ? styles.yourTurn : ''}>{partidaEncerrada ? sala.resultado.estado.replaceAll('_', ' ') : sala.reiEmXeque ? 'Xeque' : ehMeuTurno ? 'Sua vez' : 'Oponente'}</dd></div>
+            </dl>
+          )}
+          {erroJogo && <p className={styles.errorMessage} role="alert">{erroJogo}</p>}
+        </aside>
+
+        <aside className={`${styles.panel} ${styles.handPanel}`}>
+          <div className={styles.panelHeading}>
+            <span className={styles.panelLabel}>Sua mão</span>
+            <span className={styles.cardCount}>{minhaMao.length}</span>
+          </div>
+          {minhaMao.length === 0 ? (
+            <p className={styles.emptyHand}>Sem cartas disponíveis.</p>
+          ) : (
+            <div className={styles.handGrid}>
+              {minhaMao.map((carta) => {
+                const ativa = cartaSelecionada?.id === carta.id;
+
+                return (
+                  <button
+                    key={`${carta.id}-${carta.nome}`}
+                    type="button"
+                    className={`${styles.handCard} ${ativa ? styles.handCardActive : ''}`}
+                    onClick={() => toggleCarta(carta)}
+                    aria-pressed={ativa}
+                  >
+                    <strong>{carta.nome}</strong>
+                    <span>{carta.descricao}</span>
+                  </button>
+                );
+              })}
             </div>
-          </CardBody>
-        </Card>
+          )}
 
-        {/* Game Info */}
-        <div className={styles.gameInfo}>
-          <Card>
-            <CardBody>
-              <h3>Sua Mão</h3>
-              {minhaMao.length === 0 ? (
-                <p>Sem cartas disponíveis.</p>
-              ) : (
-                <div className={styles.handGrid}>
-                  {minhaMao.map((carta) => {
-                    const ativa = cartaSelecionada?.id === carta.id;
-
-                    return (
-                      <button
-                        key={`${carta.id}-${carta.nome}`}
-                        type="button"
-                        className={`${styles.handCard} ${ativa ? styles.handCardActive : ''}`}
-                        onClick={() => toggleCarta(carta)}
-                      >
-                        <strong>{carta.nome}</strong>
-                        <span>{carta.descricao}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+          {cartaSelecionada && (
+            <div className={styles.cardActions}>
+              <p><strong>{cartaSelecionada.nome}</strong> selecionada</p>
+              {cartaSelecionada.id !== 'reviver_aliado' && (
+                <Button className={styles.applyButton} variant="success" size="sm" onClick={usarCartaSelecionada}>
+                  Aplicar na peça
+                </Button>
               )}
+            </div>
+          )}
+        </aside>
 
-              {cartaSelecionada && (
-                <div className={styles.cardActions}>
-                  <p>
-                    Carta selecionada: <strong>{cartaSelecionada.nome}</strong>
-                  </p>
-                  {cartaSelecionada.id !== 'reviver_aliado' && (
-                    <Button variant="success" onClick={usarCartaSelecionada}>
-                      Aplicar Carta na Peça Selecionada
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody>
-              <h3>Informações da Partida</h3>
-              {sala && (
-                <div>
-                  <p>Sala: {sala.codigoSala}</p>
-                  <p>Turno atual: {sala.turno}</p>
-                  <p>Status: {ehMeuTurno ? 'Seu turno' : 'Turno do oponente'}</p>
-                  {erroJogo && <p className={styles.errorMessage}>{erroJogo}</p>}
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        </div>
-
-        {/* Revive Modal */}
         <Modal
           isOpen={showReviveModal}
           title="Selecionar Peça para Reviver"
@@ -404,6 +345,7 @@ export default function Game() {
                     key={idx}
                     variant="primary"
                     fullWidth
+                    className={styles.reviveButton}
                     onClick={() => {
                       socketService.send('USAR_CARTA', {
                         cartaId: 'reviver_aliado',
@@ -421,6 +363,16 @@ export default function Game() {
                 ))}
               </div>
             )}
+          </div>
+        </Modal>
+
+        <Modal isOpen={Boolean(promocaoPendente)} title="Promover peão" onClose={() => {}}>
+          <div className={styles.optionsList}>
+            {(promocaoPendente?.opcoes || []).map((tipo) => (
+              <Button key={tipo} variant="primary" fullWidth onClick={() => confirmarPromocao(tipo)}>
+                Promover para {tipo}
+              </Button>
+            ))}
           </div>
         </Modal>
       </div>

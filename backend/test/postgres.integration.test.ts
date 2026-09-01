@@ -1,0 +1,4 @@
+import test from 'node:test'; import assert from 'node:assert/strict'; import { Pool } from 'pg';
+import { PostgresRoomRepository } from '../src/modules/persistence/repository.js'; import { RoomService } from '../src/modules/rooms/rooms.js';
+const url=process.env.DATABASE_URL;
+test('Postgres salva e uma nova instância carrega a sala', { skip: !url }, async()=>{const repo=new PostgresRoomRepository(new Pool({connectionString:url}));await repo.migrate();const publisher={publish(){},publishRooms(){}};const code=`T${Date.now().toString(36).toUpperCase()}`;const first=new RoomService(repo,publisher);first.create(code);await new Promise(resolve=>setTimeout(resolve,30));const second=new RoomService(repo,publisher);await second.load();assert.equal(second.get(code)?.codigo,code);await repo.close();});
