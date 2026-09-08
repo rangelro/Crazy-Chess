@@ -137,3 +137,11 @@ O endpoint é `/ws`. O backend preserva as ações consumidas pelo frontend:
 | `SAIR_SALA` | — |
 
 As principais respostas são `CONEXAO_ESTABELECIDA`, `SALAS_ATIVAS`, `SALA_ATRIBUIDA`, `ESTADO_ATUALIZADO`, `MOVIMENTOS_PERMITIDOS`, `SALA_SAIDA` e `ERRO_SALA`.
+
+
+## Prints da aplicação
+
+![Captura de tela 1](docs/prints/Captura_de_tela_20260908_152013.png)
+
+![Captura de tela 2](docs/prints/Captura_de_tela_20260908_152054.png)
+
